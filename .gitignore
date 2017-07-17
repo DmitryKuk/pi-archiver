@@ -1,0 +1,11 @@
+# Author: Dmitry Kukovinets (d1021976@gmail.com), 17.07.2017, 14:31
+
+
+# Build results
+build/*
+
+# Hidden files and directories
+.*
+
+# But not git files
+!.git*

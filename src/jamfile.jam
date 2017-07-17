@@ -1,0 +1,12 @@
+# Author: Dmitry Kukovinets (d1021976@gmail.com), 17.07.2017, 14:31
+
+alias src : [ glob *.cpp : test-* tool-* ] ;
+
+
+exe pi-generate : tool-generate.cpp src ;
+install install-pi-generate : pi-generate : <location>../build/bin ;
+
+
+import testing ;
+
+run test-get_byte.cpp src ;

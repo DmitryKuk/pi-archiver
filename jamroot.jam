@@ -1,0 +1,28 @@
+# Author: Dmitry Kukovinets (d1021976@gmail.com), 17.07.2017, 14:31
+
+
+import os ;
+
+BOOST_ROOT = [ os.environ BOOST_ROOT ] ;
+if ! $(BOOST_ROOT)
+{
+	import errors ;
+	errors.user-error
+		: "Environment variable BOOST_ROOT not set."
+		: "Please, set it with path to boost sources as value."
+		: "Example (add to ~/.bashrc): export BOOST_ROOT='/path/to/boost_1_64'"
+		;
+}
+use-project boost : $(BOOST_ROOT) ;
+
+
+
+project pi-archiver
+	: build-dir build
+	: requirements <threading>multi <include>. <include>$(BOOST_ROOT) #<cflags>-msse4 <cxxflags>-msse4
+	: default-build <variant>release <link>static
+	;
+
+
+
+build-project src ;
