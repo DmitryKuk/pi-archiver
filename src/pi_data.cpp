@@ -17,7 +17,10 @@
 
 #include <iostream>
 #include <array>
-#include <cmath>
+#include <utility>
+#include <mutex>
+
+#include <boost/multiprecision/gmp.hpp>
 
 #include "pi_data.hpp"
 
@@ -25,15 +28,141 @@
 namespace {
 
 
-constexpr std::size_t powers_of_2_count = 25;
-
-
-std::array<long double, powers_of_2_count>
-get_powers_of_2() noexcept
+template<class Float, std::size_t PowersOf2>
+class pi_calculator
 {
-	std::array<long double, powers_of_2_count> res;
+public:
+	using float_type = Float;
 	
-	long double p = 1;
+	
+	inline pi_calculator(unsigned int correct_digits = 9, float_type eps = 1e-17):
+		correct_digits_{correct_digits},
+		eps_{std::move(eps)}
+	{
+		if (!pi_calculator::is_initialized_) {	// Thanks to GCC
+			std::lock_guard<std::mutex> l{pi_calculator::initialization_mutex_};
+			if (!pi_calculator::is_initialized_) {
+				pi_calculator::powers_of_2_ = pi_calculator::get_powers_of_2();
+				pi_calculator::is_initialized_ = true;
+			}
+		}
+	}
+	
+	
+	unsigned char get_byte(std::size_t n);
+	void test_bytes(std::size_t start_n);
+private:
+	static constexpr std::size_t powers_of_2_count_ = PowersOf2;
+	static_assert(powers_of_2_count_ > 0, "Incorrect powers_of_2_count_.");
+	
+	static std::array<float_type, powers_of_2_count_> powers_of_2_;
+	static std::mutex initialization_mutex_;
+	static bool is_initialized_;
+	
+	
+	static std::array<float_type, powers_of_2_count_> get_powers_of_2();
+	static float_type expm(float_type p, const float_type &ak);
+	
+	
+	unsigned int correct_digits_;
+	float_type eps_;
+	
+	float_type series(unsigned int m, std::size_t n);
+};	// class pi_calculator
+
+
+
+// public
+template<class Float, std::size_t PowersOf2>
+unsigned char
+pi_calculator<Float, PowersOf2>::get_byte(std::size_t n)
+{
+	using std::floor;
+	using boost::multiprecision::floor;
+	using std::trunc;
+	using boost::multiprecision::trunc;
+	using std::abs;
+	using boost::multiprecision::abs;
+	
+	pi_calculator::float_type y = 4 * series(1, n) - 2 * series(4, n) - series(5, n) - series(6, n);
+	y = abs(y - trunc(y) + 1);
+	y = 16 * (y - floor(y));
+	
+	const auto first = static_cast<unsigned char>(y);
+	y = 16 * (y - floor(y));
+	const auto second = static_cast<unsigned char>(y);
+	
+	return (first << 4) | second;
+}
+
+
+// template<class Float, std::size_t PowersOf2>
+// void
+// pi_calculator<Float, PowersOf2>::write_bytes(void *buf, std::size_t size, std::size_t start_n)
+// {
+// }
+
+
+template<class Float, std::size_t PowersOf2>
+void
+pi_calculator<Float, PowersOf2>::test_bytes(std::size_t start_n)
+{
+	using std::floor;
+	using boost::multiprecision::floor;
+	using std::trunc;
+	using boost::multiprecision::trunc;
+	using std::abs;
+	using boost::multiprecision::abs;
+	
+	pi_calculator::float_type
+		y = 4 * series(1, start_n) - 2 * series(4, start_n) - series(5, start_n) - series(6, start_n);
+	y = abs(y - trunc(y) + 1);
+	
+	
+	for (int i = 0; i < 15; ++i) {
+		y = 16 * (y - floor(y));
+		auto first = static_cast<unsigned char>(y);
+		y = 16 * (y - floor(y));
+		auto second = static_cast<unsigned char>(y);
+		
+		std::cout << std::hex << static_cast<unsigned int>(first) << static_cast<unsigned int>(second);
+	}
+	std::cout << std::endl;
+}
+
+
+
+template<class Float, std::size_t PowersOf2>
+// static
+constexpr std::size_t
+	pi_calculator<Float, PowersOf2>::powers_of_2_count_;
+
+template<class Float, std::size_t PowersOf2>
+// static
+std::array<typename pi_calculator<Float, PowersOf2>::float_type, pi_calculator<Float, PowersOf2>::powers_of_2_count_>
+	pi_calculator<Float, PowersOf2>::powers_of_2_;
+
+template<class Float, std::size_t PowersOf2>
+// static
+std::mutex
+	pi_calculator<Float, PowersOf2>::initialization_mutex_;
+
+template<class Float, std::size_t PowersOf2>
+// static
+bool
+	pi_calculator<Float, PowersOf2>::is_initialized_ = false;
+
+
+
+// private
+template<class Float, std::size_t PowersOf2>
+// static
+std::array<typename pi_calculator<Float, PowersOf2>::float_type, pi_calculator<Float, PowersOf2>::powers_of_2_count_>
+pi_calculator<Float, PowersOf2>::get_powers_of_2()
+{
+	std::array<pi_calculator::float_type, pi_calculator::powers_of_2_count_> res;
+	
+	pi_calculator::float_type p = 1;
 	for (auto &r: res) {
 		r = p;
 		p *= 2;
@@ -45,40 +174,41 @@ get_powers_of_2() noexcept
 
 // expm = 16^p mod ak
 // NOTE: Uses the left-to-right binary exponentiation scheme.
-long double
-expm(long double p, long double ak) noexcept
+template<class Float, std::size_t PowersOf2>
+// static
+typename pi_calculator<Float, PowersOf2>::float_type
+pi_calculator<Float, PowersOf2>::expm(
+	typename pi_calculator<Float, PowersOf2>::float_type p,
+	const typename pi_calculator<Float, PowersOf2>::float_type &ak
+)
 {
+	using std::trunc;
+	using boost::multiprecision::trunc;
+	
 	if (ak == 1)
 		return 0;
 	
 	// Greatest power of two less than or equal to p
-	long double pt;
+	pi_calculator::float_type pt = pi_calculator::powers_of_2_[0];
 	std::size_t i;
-	{
-		static const auto tp = get_powers_of_2();
-		static_assert(powers_of_2_count > 0, "Incorrect powers_of_2_count.");
-		pt = tp[0];
-		for (i = 1; i < tp.size(); ++i)
-			if (tp[i] > p) {
-				pt = tp[i - 1];
-				break;
-			}
-	}
-	
+	for (i = 1; i < pi_calculator::powers_of_2_.size(); ++i)
+		if (pi_calculator::powers_of_2_[i] > p) {
+			pt = pi_calculator::powers_of_2_[i - 1];
+			break;
+		}
 	
 	// Binary exponentiation algorithm modulo ak
-	long double p1 = p;
-	long double r = 1;
-	for (std::size_t j = 1; j <= i; ++j) {
-		if (p1 >= pt) {
-			p1 -= pt;
+	pi_calculator::float_type r = 1;
+	for (std::size_t j = 0; j < i; ++j) {
+		if (p >= pt) {
+			p -= pt;
 			r *= 16;
-			r -= std::trunc(r / ak) * ak;
+			r -= trunc(r / ak) * ak;
 		}
 		pt *= 0.5;
 		if (pt >= 1) {
 			r *= r;
-			r -= std::trunc(r / ak) * ak;
+			r -= trunc(r / ak) * ak;
 		}
 	}
 	
@@ -86,31 +216,37 @@ expm(long double p, long double ak) noexcept
 }
 
 
-
 // Evaluates the series sum_k 16^(n-k)/(8*k+m) using the modular exponentiation technique.
-long double
-series(long m, long n)
+template<class Float, std::size_t PowersOf2>
+typename pi_calculator<Float, PowersOf2>::float_type
+pi_calculator<Float, PowersOf2>::series(unsigned int m, std::size_t n)
 {
-	constexpr long double eps = 1e-40;
-	long double s = 0;
+	using std::trunc;
+	using boost::multiprecision::trunc;
+	
+	typename pi_calculator<Float, PowersOf2>::float_type s = 0;
 	
 	// Sum the series up to n
-	for (long k = 0; k < n; ++k) {
-		long double ak = 8 * k + m;
-		s += expm(n - k, ak) / ak;
-		s -= std::trunc(s);
+	{
+		pi_calculator::float_type ak = m;
+		for (std::size_t k = 0; k < n; ++k) {
+			ak = 8 * k + m;
+			s += expm(n - k, ak) / ak;
+			s -= trunc(s);
+		}
 	}
 	
 	// Compute a few terms where k >= n
-	for (long k = n; k <= n + 100; ++k) {
-		long double ak = 8 * k + m;
-		
-		long double t = std::pow(16, n - k) / ak;
-		if (t < eps)
-			break;
-		
-		s += t;
-		s -= std::trunc(s);
+	{
+		pi_calculator::float_type t, power_of_16 = 1;
+		for (std::size_t k = n; k <= n + 100; ++k, power_of_16 /= 16) {
+			t = power_of_16 / (8 * k + m);
+			if (t < this->eps_)
+				break;
+			
+			s += t;
+			s -= trunc(s);
+		}
 	}
 	
 	return s;
@@ -125,42 +261,34 @@ namespace pi {
 
 
 unsigned char
-get_byte(long n) noexcept
+get_byte(std::size_t n)
 {
-	long double y = 4 * series(1, n) - 2 * series(4, n) - series(5, n) - series(6, n);
-	y = std::abs(y - std::trunc(y) + 1);
-	y = 16 * (y - std::floor(y));
-	
-	const auto first = static_cast<unsigned char>(y);
-	y = 16 * (y - std::floor(y));
-	const auto second = static_cast<unsigned char>(y);
-	
-	return (first << 4) | second;
+	if (n <= 15'000'000) {
+		pi_calculator<long double, 25> c;
+		return c.get_byte(n);
+	} else {
+		pi_calculator<boost::multiprecision::mpf_float_100, 35> c;
+		return c.get_byte(n);
+	}
 }
 
 
 // void
-// write_bytes(void *buf, std::size_t size, long start_n)
+// write_bytes(void *buf, std::size_t size, std::size_t start_n)
 // {
 // }
 
 
 void
-test_bytes(long start_n)
+test_bytes(std::size_t start_n)
 {
-	long double y = 4 * series(1, start_n) - 2 * series(4, start_n) - series(5, start_n) - series(6, start_n);
-	y = std::abs(y - std::trunc(y) + 1);
-	
-	
-	for (int i = 0; i < 15; ++i) {
-		y = 16 * (y - std::floor(y));
-		auto first = static_cast<unsigned char>(y);
-		y = 16 * (y - std::floor(y));
-		auto second = static_cast<unsigned char>(y);
-		
-		std::cout << std::hex << static_cast<unsigned int>(first) << static_cast<unsigned int>(second);
+	if (start_n <= 15'000'000) {
+		pi_calculator<long double, 25> c;
+		c.test_bytes(start_n);
+	} else {
+		pi_calculator<boost::multiprecision::mpf_float_100, 35> c;
+		c.test_bytes(start_n);
 	}
-	std::cout << std::endl;
 }
 
 

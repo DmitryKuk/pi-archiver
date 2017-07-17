@@ -8,7 +8,7 @@
 int
 main()
 {
-	long off = 10'000'001;
+	long off = 100000;
 	
 	pi::test_bytes(off + 0);
 	
@@ -18,7 +18,7 @@ main()
 	return 0;
 }
 
-// dobule, 1e-17
+// double, 1e-17
 //          0: 243f6a8885a3
 //        100: 29b7c97c50dd
 //      1 000: 49f1c09b07
@@ -32,4 +32,8 @@ main()
 //     10 000: 8ac8fcfb8016c
 //    100 000: 35ea16c406363a
 // 10 000 000: 7af5863efed8d49
+// 10 000 001: af5863efed8de
+
+// long double, 1e-17
+//    100 000: 35ea16c406363a
 // 10 000 001: af5863efed8de

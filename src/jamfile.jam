@@ -1,6 +1,16 @@
 # Author: Dmitry Kukovinets (d1021976@gmail.com), 17.07.2017, 14:31
 
-alias src : [ glob *.cpp : test-* tool-* ] ;
+
+lib gmp : : <name>gmp ;
+
+
+lib src
+	:
+		[ glob *.cpp : test-* tool-* ]
+		gmp
+	:
+	: <link>static
+	;
 
 
 exe pi-generate : tool-generate.cpp src ;

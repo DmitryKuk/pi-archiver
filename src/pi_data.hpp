@@ -7,16 +7,9 @@
 namespace pi {
 
 
-unsigned char
-get_byte(long n) noexcept;
-
-
-void
-write_bytes(void *buf, std::size_t size, long start_n);
-
-
-void
-test_bytes(long start_n);
+unsigned char get_byte(std::size_t n);
+void write_bytes(void *buf, std::size_t size, std::size_t start_n);
+void test_bytes(std::size_t start_n);
 
 
 };	// namespace pi
