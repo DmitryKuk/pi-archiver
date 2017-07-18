@@ -15,7 +15,6 @@
 // David H. Bailey     2006-09-08
 
 
-#include <iostream>
 #include <array>
 #include <utility>
 #include <mutex>
@@ -50,6 +49,7 @@ public:
 	
 	
 	unsigned char get_byte(std::size_t n);
+	void write_bytes(void *buf, std::size_t size, std::size_t start_n);
 	void test_bytes(std::size_t start_n);
 private:
 	static constexpr std::size_t powers_of_2_count_ = PowersOf2;
@@ -64,8 +64,8 @@ private:
 	static float_type expm(float_type p, const float_type &ak);
 	
 	
-	unsigned int correct_digits_;
-	float_type eps_;
+	const unsigned int correct_digits_;
+	const float_type eps_;
 	
 	float_type series(unsigned int m, std::size_t n);
 };	// class pi_calculator
@@ -84,28 +84,20 @@ pi_calculator<Float, PowersOf2>::get_byte(std::size_t n)
 	using std::abs;
 	using boost::multiprecision::abs;
 	
+	
+	n *= 2;	// Number of byte, not hex digit
+	
 	pi_calculator::float_type y = 4 * series(1, n) - 2 * series(4, n) - series(5, n) - series(6, n);
 	y = abs(y - trunc(y) + 1);
-	y = 16 * (y - floor(y));
+	y = 256 * (y - floor(y));
 	
-	const auto first = static_cast<unsigned char>(y);
-	y = 16 * (y - floor(y));
-	const auto second = static_cast<unsigned char>(y);
-	
-	return (first << 4) | second;
+	return static_cast<unsigned char>(y);
 }
-
-
-// template<class Float, std::size_t PowersOf2>
-// void
-// pi_calculator<Float, PowersOf2>::write_bytes(void *buf, std::size_t size, std::size_t start_n)
-// {
-// }
 
 
 template<class Float, std::size_t PowersOf2>
 void
-pi_calculator<Float, PowersOf2>::test_bytes(std::size_t start_n)
+pi_calculator<Float, PowersOf2>::write_bytes(void *buf, std::size_t size, std::size_t start_n)
 {
 	using std::floor;
 	using boost::multiprecision::floor;
@@ -114,20 +106,38 @@ pi_calculator<Float, PowersOf2>::test_bytes(std::size_t start_n)
 	using std::abs;
 	using boost::multiprecision::abs;
 	
-	pi_calculator::float_type
-		y = 4 * series(1, start_n) - 2 * series(4, start_n) - series(5, start_n) - series(6, start_n);
-	y = abs(y - trunc(y) + 1);
+	
+	start_n *= 2;	// Number of byte, not hex digit
+	
+	pi_calculator::float_type y;
+	auto byte_buf = static_cast<unsigned char *>(buf);
+	
+	const auto write_seq =
+		[&](std::size_t seq_size)
+		{
+			y = 4 * series(1, start_n) - 2 * series(4, start_n) - series(5, start_n) - series(6, start_n);
+			y = abs(y - trunc(y) + 1);
+			
+			for (std::size_t i = 0; i < seq_size; ++i, ++byte_buf) {
+				y = 256 * (y - floor(y));
+				*byte_buf = static_cast<unsigned char>(y);
+			}
+		};
 	
 	
-	for (int i = 0; i < 70; ++i) {
-		y = 16 * (y - floor(y));
-		auto first = static_cast<unsigned char>(y);
-		y = 16 * (y - floor(y));
-		auto second = static_cast<unsigned char>(y);
-		
-		std::cout << std::hex << static_cast<unsigned int>(first) << static_cast<unsigned int>(second);
+	const auto stop_n = start_n + size * 2;
+	
+	{
+		const auto correct_digits = this->correct_digits_ & (~static_cast<decltype(this->correct_digits_)>(1));
+		for (; start_n + correct_digits < stop_n; start_n += correct_digits)
+			write_seq(correct_digits / 2);
 	}
-	std::cout << std::endl;
+	
+	{
+		const auto trailing = stop_n - start_n;
+		if (trailing > 0)
+			write_seq(trailing);
+	}
 }
 
 
@@ -263,31 +273,36 @@ namespace pi {
 unsigned char
 get_byte(std::size_t n)
 {
-	if (n <= 15'000'000) {
+	constexpr std::size_t threshold = 7'500'000;
+	
+	if (n <= threshold) {
 		pi_calculator<long double, 25> c;
 		return c.get_byte(n);
 	} else {
-		pi_calculator<boost::multiprecision::mpf_float_100, 35> c;
+		pi_calculator<boost::multiprecision::mpf_float_100, 35> c{68, 1e-90};
 		return c.get_byte(n);
 	}
 }
 
 
-// void
-// write_bytes(void *buf, std::size_t size, std::size_t start_n)
-// {
-// }
-
-
 void
-test_bytes(std::size_t start_n)
+write_bytes(void *buf, std::size_t size, std::size_t start_n)
 {
-	if (start_n <= 15'000'000) {
+	constexpr std::size_t threshold = 7'500'000;
+	
+	if (start_n <= threshold) {
+		const auto low_size = std::min(size, threshold - start_n);
+		size -= low_size;
+		
 		pi_calculator<long double, 25> c;
-		c.test_bytes(start_n);
-	} else {
-		pi_calculator<boost::multiprecision::mpf_float_100, 35> c{9, 1e-90};
-		c.test_bytes(start_n);
+		c.write_bytes(buf, low_size, start_n);
+		buf = static_cast<unsigned char *>(buf) + low_size;
+	}
+	
+	const auto stop_n = start_n + size;
+	if (threshold < stop_n) {
+		pi_calculator<boost::multiprecision::mpf_float_100, 35> c{68, 1e-90};
+		c.write_bytes(buf, size, start_n);
 	}
 }
 

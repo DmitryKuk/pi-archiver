@@ -131,7 +131,7 @@ main()
 	int offset = 100;
 	int size = 1000;
 	for (int i = offset; i < offset + size; ++i) {
-		const auto o = original_get_byte(i);
+		const auto o = original_get_byte(i * 2);
 		const auto m = pi::get_byte(i);
 		
 		if (m != o) {

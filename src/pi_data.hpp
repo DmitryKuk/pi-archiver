@@ -9,7 +9,6 @@ namespace pi {
 
 unsigned char get_byte(std::size_t n);
 void write_bytes(void *buf, std::size_t size, std::size_t start_n);
-void test_bytes(std::size_t start_n);
 
 
 };	// namespace pi

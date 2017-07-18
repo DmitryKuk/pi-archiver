@@ -13,10 +13,11 @@ lib src
 	;
 
 
-exe pi-generate : tool-generate.cpp src ;
+exe pi-generate : tool-generate.cpp src /boost//filesystem /boost//program_options ;
 install install-pi-generate : pi-generate : <location>../build/bin ;
 
 
 import testing ;
 
 run test-get_byte.cpp src ;
+run test-write_bytes.cpp src ;
