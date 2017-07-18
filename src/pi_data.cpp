@@ -119,7 +119,7 @@ pi_calculator<Float, PowersOf2>::test_bytes(std::size_t start_n)
 	y = abs(y - trunc(y) + 1);
 	
 	
-	for (int i = 0; i < 15; ++i) {
+	for (int i = 0; i < 70; ++i) {
 		y = 16 * (y - floor(y));
 		auto first = static_cast<unsigned char>(y);
 		y = 16 * (y - floor(y));
@@ -286,7 +286,7 @@ test_bytes(std::size_t start_n)
 		pi_calculator<long double, 25> c;
 		c.test_bytes(start_n);
 	} else {
-		pi_calculator<boost::multiprecision::mpf_float_100, 35> c;
+		pi_calculator<boost::multiprecision::mpf_float_100, 35> c{9, 1e-90};
 		c.test_bytes(start_n);
 	}
 }
